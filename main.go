@@ -31,9 +31,11 @@ type Potion struct {
 }
 
 type Game struct {
-	player  *Player
-	enemies *[]Enemy
-	potions *[]Potion
+	player       *Player
+	enemies      *[]Enemy
+	potions      *[]Potion
+	tilemapJSON  *TilemapJSON
+	tilemapImage *ebiten.Image
 }
 
 func (g *Game) Update() error {
@@ -89,6 +91,33 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// settting for placing
 	opts := &ebiten.DrawImageOptions{}
 
+	// T I L E M A P
+	// Each layer
+	for _, layer := range g.tilemapJSON.Layers {
+		// Each tile
+		for index, id := range layer.Data {
+
+			// Where to draw on the screen
+			x := index % layer.Width
+			y := index / layer.Width
+			x *= 16
+			y *= 16
+			opts.GeoM.Translate(float64(x), float64(y))
+
+			// Where to find what to draw from the actual image
+			srcX := (id - 1) % 22
+			srcY := (id - 1) / 22
+			srcX *= 16
+			srcY *= 16
+
+			// Draw tile
+			screen.DrawImage(g.tilemapImage.SubImage(image.Rect(srcX, srcY, srcX+16, srcY+16)).(*ebiten.Image), opts)
+
+			// Reset screen drawing location
+			opts.GeoM.Reset()
+		}
+	}
+
 	// Make player
 	opts.GeoM.Translate(g.player.X, g.player.Y)
 	screen.DrawImage(
@@ -127,6 +156,17 @@ func main() {
 	// window dimentions
 	ebiten.SetWindowSize(640, 480)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+
+	// Tilemap
+	tilemapJSON, err := NewTilemapJSON("assets/maps/spawn.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tilemapImage, _, err := ebitenutil.NewImageFromFile("assets/images/TilesetFloor.png")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// get ninja image
 	ninja, _, err := ebitenutil.NewImageFromFile("assets/images/ninja.png")
@@ -190,6 +230,8 @@ func main() {
 				5,
 			},
 		},
+		tilemapJSON:  tilemapJSON,
+		tilemapImage: tilemapImage,
 	}
 
 	if err := ebiten.RunGame(game); err != nil {
